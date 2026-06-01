@@ -1,10 +1,4 @@
-import { ChromaClient } from 'chromadb';
 import { pipeline } from '@xenova/transformers';
-import dotenv from 'dotenv';
-dotenv.config();
-
-const CHROMA_URL = process.env.CHROMA_URL || 'http://localhost:8000';
-const chroma = new ChromaClient({ path: CHROMA_URL });
 
 let embedder = null;
 async function getEmbedder() {
@@ -24,8 +18,21 @@ async function generateEmbeddings(texts) {
   return results;
 }
 
+function cosineSimilarity(a, b) {
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  if (!normA || !normB) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+// In-memory store: collectionName -> { ids, documents, embeddings, metadatas }
+const store = new Map();
+
 export async function storeVideoChunks({ collectionName, videoId, sourceUrl, chunks, metadataExtras = {} }) {
-  const collection = await chroma.getOrCreateCollection({ name: collectionName });
   const ids = chunks.map((_, idx) => `${videoId}-${idx}`);
   const metadatas = chunks.map((_, idx) => ({
     video_id: videoId,
@@ -33,22 +40,51 @@ export async function storeVideoChunks({ collectionName, videoId, sourceUrl, chu
     source_url: sourceUrl,
     ...metadataExtras,
   }));
-  const embeddings = await generateEmbeddings(chunks);
-  if (chunks.length) {
-    await collection.upsert({ ids, documents: chunks, embeddings, metadatas });
+
+  const embeddings = chunks.length ? await generateEmbeddings(chunks) : [];
+
+  // Upsert: replace any existing entries with same id
+  const existing = store.get(collectionName) || { ids: [], documents: [], embeddings: [], metadatas: [] };
+  const idMap = new Map(existing.ids.map((id, i) => [id, i]));
+
+  for (let i = 0; i < ids.length; i++) {
+    const idx = idMap.get(ids[i]);
+    if (idx !== undefined) {
+      existing.documents[idx] = chunks[i];
+      existing.embeddings[idx] = embeddings[i];
+      existing.metadatas[idx] = metadatas[i];
+    } else {
+      existing.ids.push(ids[i]);
+      existing.documents.push(chunks[i]);
+      existing.embeddings.push(embeddings[i]);
+      existing.metadatas.push(metadatas[i]);
+    }
   }
-  console.log(`[ContentIQ] Stored ${chunks.length} chunks in ${collectionName}`);
+
+  store.set(collectionName, existing);
+  console.log(`[ContentIQ] Stored ${chunks.length} chunks in ${collectionName} (in-memory)`);
   return { chunkCount: chunks.length };
 }
 
 export async function queryVideoChunks({ collectionName, query, nResults = 2 }) {
   try {
-    const collection = await chroma.getCollection({ name: collectionName });
-    const queryEmbeddings = await generateEmbeddings([query]);
-    const results = await collection.query({ queryEmbeddings, nResults });
+    const collection = store.get(collectionName);
+    if (!collection || !collection.embeddings.length) return { documents: [], metadatas: [] };
+
+    const [queryEmbedding] = await generateEmbeddings([query]);
+
+    const scored = collection.embeddings.map((emb, i) => ({
+      score: cosineSimilarity(queryEmbedding, emb),
+      document: collection.documents[i],
+      metadata: collection.metadatas[i],
+    }));
+
+    scored.sort((a, b) => b.score - a.score);
+    const top = scored.slice(0, nResults);
+
     return {
-      documents: results?.documents?.[0] || [],
-      metadatas: results?.metadatas?.[0] || [],
+      documents: top.map((r) => r.document),
+      metadatas: top.map((r) => r.metadata),
     };
   } catch (err) {
     console.error(`[ContentIQ] Query failed for ${collectionName}:`, err.message);

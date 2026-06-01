@@ -54,8 +54,10 @@ export async function handleAnalyze({ videoA, videoB }) {
     throw new Error('ChromaDB unreachable.');
   }
 
-  const metadataPayloadA = { videoId: metaA.videoId, title: metaA.title, creatorName: metaA.creatorName, views: metaA.views, likes: metaA.likes, comments: metaA.comments, engagementRate: metaA.engagementRate, uploadDate: metaA.uploadDate, duration: metaA.duration, topHashtags: metaA.topHashtags || [], sourceType: metaA.sourceType };
-  const metadataPayloadB = { videoId: metaB.videoId, title: metaB.title, creatorName: metaB.creatorName, views: metaB.views, likes: metaB.likes, comments: metaB.comments, engagementRate: metaB.engagementRate, uploadDate: metaB.uploadDate, duration: metaB.duration, topHashtags: metaB.topHashtags || [], sourceType: metaB.sourceType, instagramMock: metaB.instagramMock || false };
+  const thumbUrl = (meta) => meta.thumbnail || (meta.videoId ? `https://img.youtube.com/vi/${meta.videoId}/hqdefault.jpg` : null);
+
+  const metadataPayloadA = { videoId: metaA.videoId, title: metaA.title, creatorName: metaA.creatorName, views: metaA.views, likes: metaA.likes, comments: metaA.comments, engagementRate: metaA.engagementRate, uploadDate: metaA.uploadDate, duration: metaA.duration, topHashtags: metaA.topHashtags || [], sourceType: metaA.sourceType, thumbnail: thumbUrl(metaA) };
+  const metadataPayloadB = { videoId: metaB.videoId, title: metaB.title, creatorName: metaB.creatorName, views: metaB.views, likes: metaB.likes, comments: metaB.comments, engagementRate: metaB.engagementRate, uploadDate: metaB.uploadDate, duration: metaB.duration, topHashtags: metaB.topHashtags || [], sourceType: metaB.sourceType, instagramMock: metaB.instagramMock || false, thumbnail: thumbUrl(metaB) };
 
   sessionStore.metadataByVideoId = { A: metadataPayloadA, B: metadataPayloadB };
   sessionStore.lastRunAt = new Date().toISOString();
