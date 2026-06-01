@@ -1,4 +1,11 @@
 import { pipeline } from '@xenova/transformers';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = join(__dirname, '..', 'data');
+const STORE_FILE = join(DATA_DIR, 'vector-store.json');
 
 let embedder = null;
 async function getEmbedder() {
@@ -29,8 +36,29 @@ function cosineSimilarity(a, b) {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-// In-memory store: collectionName -> { ids, documents, embeddings, metadatas }
-const store = new Map();
+// Persist store to disk so it survives server restarts
+function loadStore() {
+  try {
+    if (existsSync(STORE_FILE)) {
+      const raw = readFileSync(STORE_FILE, 'utf8');
+      const obj = JSON.parse(raw);
+      return new Map(Object.entries(obj));
+    }
+  } catch { /* start fresh if file is corrupt */ }
+  return new Map();
+}
+
+function saveStore(map) {
+  try {
+    if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+    writeFileSync(STORE_FILE, JSON.stringify(Object.fromEntries(map)));
+  } catch (err) {
+    console.warn('[ContentIQ] Could not persist vector store:', err.message);
+  }
+}
+
+const store = loadStore();
+console.log(`[ContentIQ] Vector store loaded — ${store.size} collection(s) from disk`);
 
 export async function storeVideoChunks({ collectionName, videoId, sourceUrl, chunks, metadataExtras = {} }) {
   const ids = chunks.map((_, idx) => `${videoId}-${idx}`);
@@ -43,7 +71,6 @@ export async function storeVideoChunks({ collectionName, videoId, sourceUrl, chu
 
   const embeddings = chunks.length ? await generateEmbeddings(chunks) : [];
 
-  // Upsert: replace any existing entries with same id
   const existing = store.get(collectionName) || { ids: [], documents: [], embeddings: [], metadatas: [] };
   const idMap = new Map(existing.ids.map((id, i) => [id, i]));
 
@@ -62,7 +89,9 @@ export async function storeVideoChunks({ collectionName, videoId, sourceUrl, chu
   }
 
   store.set(collectionName, existing);
-  console.log(`[ContentIQ] Stored ${chunks.length} chunks in ${collectionName} (in-memory)`);
+  saveStore(store);
+
+  console.log(`[ContentIQ] Stored ${chunks.length} chunks in ${collectionName}`);
   return { chunkCount: chunks.length };
 }
 
