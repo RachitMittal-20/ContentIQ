@@ -56,7 +56,7 @@ export default function Chat({ metadata, loadedCollectionsText }) {
 
       let full = '';
       try {
-        const r = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3002'}/api/chat`, {
+        const r = await fetch(`https://contentiq-sm0f.onrender.com/api/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
           body: JSON.stringify({

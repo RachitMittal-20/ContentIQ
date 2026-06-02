@@ -143,7 +143,7 @@ function Landing({
     let mounted = true;
     (async () => {
       try {
-        const r = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3002'}/api/metadata`);
+        const r = await fetch(`https://contentiq-sm0f.onrender.com/api/metadata`);
         const d = await r.json();
         if (!mounted) return;
         if (d.success && d.metadataA && d.metadataB) {
@@ -205,7 +205,7 @@ function Landing({
 
   const apiAnalyze = async (videoA, videoB) => {
     // Must keep exact request body/endpoint.
-    const r = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3002'}/api/analyze`, {
+    const r = await fetch(`https://contentiq-sm0f.onrender.com/api/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ videoA, videoB }),
