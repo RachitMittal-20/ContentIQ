@@ -43,19 +43,12 @@ export default function Dashboard({ metadata }) {
             <div key={cls} className={'vid-card ' + cls + ' in'} style={{ transitionDelay: '80ms' }}>
 
               {thumb && (
-                <div className="vid-thumb-wrap">
-                  <img
-                    src={thumb}
-                    alt={m?.title || label}
-                    className="vid-thumb"
-                    onError={(e) => { e.currentTarget.parentElement.style.display = 'none'; }}
-                  />
-                  <div className="vid-thumb-overlay" />
-                  <span className={'card-tag-pill thumb-pill ' + (cls === 'ca' ? 'ca' : 'cb')}>{label}</span>
-                  {m?.duration && (
-                    <span className="vid-duration">{m.duration}</span>
-                  )}
-                </div>
+                <img
+                  src={thumb}
+                  alt={m?.title || label}
+                  style={{ width: '100%', borderRadius: 8, marginBottom: 12, objectFit: 'cover', maxHeight: 180 }}
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
               )}
 
               {!thumb && <div className="card-tag-pill" style={{ marginBottom: 14 }}>{label}</div>}
