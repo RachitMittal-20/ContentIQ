@@ -67,8 +67,8 @@ export async function handleAnalyze({ videoA, videoB }) {
 }
 
 export async function handleChatStream({ res, message, history = [], metadata }) {
-  const metadataA = metadata?.A || { title: 'Video A', creatorName: 'Unknown', engagementRate: 0 };
-  const metadataB = metadata?.B || { title: 'Video B', creatorName: 'Unknown', engagementRate: 0 };
+  const metadataA = metadata?.A || { title: 'Video A', creatorName: 'Unknown', views: 0, likes: 0, comments: 0, engagementRate: 0 };
+  const metadataB = metadata?.B || { title: 'Video B', creatorName: 'Unknown', views: 0, likes: 0, comments: 0, engagementRate: 0 };
 
   const [resultsA, resultsB] = await Promise.all([
     queryVideoChunks({ collectionName: 'video_a_chunks', query: message, nResults: 1 }),
@@ -88,14 +88,26 @@ export async function handleChatStream({ res, message, history = [], metadata })
   const context = contextChunks.join('\n\n');
   const systemPrompt = `You are ContentIQ, an AI analyst helping content creators understand video performance.
 
-You have access to transcripts and metadata from two videos:
-- Video A: ${metadataA.title} by ${metadataA.creatorName} — Engagement Rate: ${metadataA.engagementRate ?? 0}%
-- Video B: ${metadataB.title} by ${metadataB.creatorName} — Engagement Rate: ${metadataB.engagementRate ?? 0}%
+You have analyzed two YouTube videos:
+
+Video A: ${metadataA.title}
+- Creator: ${metadataA.creatorName ?? 'Unknown'}
+- Views: ${metadataA.views ?? 0}
+- Likes: ${metadataA.likes ?? 0}
+- Comments: ${metadataA.comments ?? 0}
+- Engagement Rate: ${metadataA.engagementRate ?? 0}%
+
+Video B: ${metadataB.title}
+- Creator: ${metadataB.creatorName ?? 'Unknown'}
+- Views: ${metadataB.views ?? 0}
+- Likes: ${metadataB.likes ?? 0}
+- Comments: ${metadataB.comments ?? 0}
+- Engagement Rate: ${metadataB.engagementRate ?? 0}%
 
 When answering:
 1. Always cite which video and chunk you're drawing from: [Source: Video A, chunk N]
 2. Be specific — reference actual transcript content, not generalizations
-3. When comparing, always mention the engagement rate difference
+3. When comparing, always reference the actual metrics above (views, likes, comments, engagement rate)
 4. Suggest improvements based on data, not opinion
 5. Keep responses concise but insightful
 
