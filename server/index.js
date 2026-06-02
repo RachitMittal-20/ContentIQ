@@ -15,7 +15,12 @@ app.set('trust proxy', 1);
 
 app.use(
   cors({
-    origin: ['http://localhost:5173', 'https://content-iq-lake.vercel.app', 'https://contentiq.vercel.app'],
+    origin: [
+      'http://localhost:5173',
+      'https://content-iq-lake.vercel.app',
+      'https://contentiq.vercel.app',
+      process.env.FRONTEND_URL,
+    ].filter(Boolean),
     credentials: true,
   }),
 );
