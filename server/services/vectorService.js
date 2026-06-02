@@ -4,24 +4,18 @@ dotenv.config();
 // Pure in-memory store — intentionally resets on each server restart / new analyze call.
 const store = new Map();
 
-async function generateEmbeddings(texts) {
-  const res = await fetch('https://api.groq.com/openai/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ model: 'nomic-embed-text-v1_5', input: texts }),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Groq embeddings error ${res.status}: ${errText}`);
+function generateLocalEmbedding(text) {
+  const vec = new Array(384).fill(0);
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    vec[i % 384] += code * (i + 1);
   }
+  const mag = Math.sqrt(vec.reduce((s, v) => s + v * v, 0)) || 1;
+  return vec.map(v => v / mag);
+}
 
-  const data = await res.json();
-  // API returns items in order but spec says sort by index to be safe
-  return data.data.sort((a, b) => a.index - b.index).map(d => d.embedding);
+function generateEmbeddings(texts) {
+  return texts.map(generateLocalEmbedding);
 }
 
 function cosineSimilarity(a, b) {
@@ -36,7 +30,7 @@ function cosineSimilarity(a, b) {
 }
 
 export async function storeVideoChunks({ collectionName, videoId, sourceUrl, chunks, metadataExtras = {} }) {
-  const embeddings = chunks.length ? await generateEmbeddings(chunks) : [];
+  const embeddings = chunks.length ? generateEmbeddings(chunks) : [];
 
   const metadatas = chunks.map((_, idx) => ({
     video_id: videoId,
@@ -57,7 +51,7 @@ export async function queryVideoChunks({ collectionName, query, nResults = 2 }) 
     const collection = store.get(collectionName);
     if (!collection || !collection.embeddings.length) return { documents: [], metadatas: [] };
 
-    const [queryEmbedding] = await generateEmbeddings([query]);
+    const [queryEmbedding] = generateEmbeddings([query]);
 
     const scored = collection.embeddings.map((emb, i) => ({
       score: cosineSimilarity(queryEmbedding, emb),
