@@ -16,7 +16,9 @@ export default function Dashboard() {
     let mounted = true;
     (async () => {
       try {
-        const res = await fetch('http://localhost:3001/api/metadata');
+        const res = await fetch('https://snowshoe-seventeen-worsening.ngrok-free.dev/api/metadata', {
+          headers: { 'ngrok-skip-browser-warning': '1' },
+        });
         const data = await res.json();
         if (!mounted) return;
         if (!data.success) throw new Error(data.error || 'Failed to load metadata');

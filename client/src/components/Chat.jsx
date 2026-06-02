@@ -56,9 +56,9 @@ export default function Chat({ metadata, loadedCollectionsText }) {
 
       let full = '';
       try {
-        const r = await fetch('/api/chat', {
+        const r = await fetch('https://snowshoe-seventeen-worsening.ngrok-free.dev/api/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
           body: JSON.stringify({
             message: msg,
             history: chatHistoryRef.current.slice(-10).map((m) => ({ role: m.role, content: m.content })),

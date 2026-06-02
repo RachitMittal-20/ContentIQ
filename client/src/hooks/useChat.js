@@ -47,9 +47,9 @@ export default function useChat({ metadata }) {
       setIsStreaming(true);
 
       try {
-        const res = await fetch('https://snowshoe-seventeen-worsening.ngrok-free.dev', {
+        const res = await fetch('https://snowshoe-seventeen-worsening.ngrok-free.dev/api/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
           body: JSON.stringify({
             message: text,
             history: toGeminiHistory(historyRef.current),

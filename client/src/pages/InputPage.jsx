@@ -55,9 +55,9 @@ export default function InputPage() {
     });
 
     try {
-      const res = await fetch('http://localhost:3001/api/analyze', {
+      const res = await fetch('https://snowshoe-seventeen-worsening.ngrok-free.dev/api/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
         body: JSON.stringify({ videoA: videoAUrl, videoB: videoBUrl }),
       });
 
