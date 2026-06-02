@@ -50,8 +50,8 @@ export async function handleAnalyze({ videoA, videoB }) {
     await storeVideoChunks({ collectionName: 'video_a_chunks', videoId: 'A', sourceUrl: videoA, chunks: chunksA, metadataExtras: { title: metaA.title, creatorName: metaA.creatorName } });
     await storeVideoChunks({ collectionName: 'video_b_chunks', videoId: 'B', sourceUrl: videoB, chunks: chunksB, metadataExtras: { title: metaB.title, creatorName: metaB.creatorName } });
   } catch (err) {
-    console.error('[ContentIQ] Chroma store failed:', err);
-    throw new Error('ChromaDB unreachable.');
+    console.error('[ContentIQ] Vector store failed:', err);
+    throw new Error('Failed to store embeddings.');
   }
 
   const thumbUrl = (meta) => meta.thumbnail || (meta.videoId ? `https://img.youtube.com/vi/${meta.videoId}/hqdefault.jpg` : null);

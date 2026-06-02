@@ -1,28 +1,27 @@
-import { pipeline } from '@xenova/transformers';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+dotenv.config();
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = join(__dirname, '..', 'data');
-const STORE_FILE = join(DATA_DIR, 'vector-store.json');
-
-let embedder = null;
-async function getEmbedder() {
-  if (!embedder) {
-    embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
-  }
-  return embedder;
-}
+// Pure in-memory store — intentionally resets on each server restart / new analyze call.
+const store = new Map();
 
 async function generateEmbeddings(texts) {
-  const embed = await getEmbedder();
-  const results = [];
-  for (const text of texts) {
-    const output = await embed(text, { pooling: 'mean', normalize: true });
-    results.push(Array.from(output.data));
+  const res = await fetch('https://api.groq.com/openai/v1/embeddings', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ model: 'nomic-embed-text-v1_5', input: texts }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Groq embeddings error ${res.status}: ${errText}`);
   }
-  return results;
+
+  const data = await res.json();
+  // API returns items in order but spec says sort by index to be safe
+  return data.data.sort((a, b) => a.index - b.index).map(d => d.embedding);
 }
 
 function cosineSimilarity(a, b) {
@@ -36,32 +35,9 @@ function cosineSimilarity(a, b) {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-// Persist store to disk so it survives server restarts
-function loadStore() {
-  try {
-    if (existsSync(STORE_FILE)) {
-      const raw = readFileSync(STORE_FILE, 'utf8');
-      const obj = JSON.parse(raw);
-      return new Map(Object.entries(obj));
-    }
-  } catch { /* start fresh if file is corrupt */ }
-  return new Map();
-}
-
-function saveStore(map) {
-  try {
-    if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-    writeFileSync(STORE_FILE, JSON.stringify(Object.fromEntries(map)));
-  } catch (err) {
-    console.warn('[ContentIQ] Could not persist vector store:', err.message);
-  }
-}
-
-const store = loadStore();
-console.log(`[ContentIQ] Vector store loaded — ${store.size} collection(s) from disk`);
-
 export async function storeVideoChunks({ collectionName, videoId, sourceUrl, chunks, metadataExtras = {} }) {
-  const ids = chunks.map((_, idx) => `${videoId}-${idx}`);
+  const embeddings = chunks.length ? await generateEmbeddings(chunks) : [];
+
   const metadatas = chunks.map((_, idx) => ({
     video_id: videoId,
     chunk_index: idx,
@@ -69,27 +45,8 @@ export async function storeVideoChunks({ collectionName, videoId, sourceUrl, chu
     ...metadataExtras,
   }));
 
-  const embeddings = chunks.length ? await generateEmbeddings(chunks) : [];
-
-  const existing = store.get(collectionName) || { ids: [], documents: [], embeddings: [], metadatas: [] };
-  const idMap = new Map(existing.ids.map((id, i) => [id, i]));
-
-  for (let i = 0; i < ids.length; i++) {
-    const idx = idMap.get(ids[i]);
-    if (idx !== undefined) {
-      existing.documents[idx] = chunks[i];
-      existing.embeddings[idx] = embeddings[i];
-      existing.metadatas[idx] = metadatas[i];
-    } else {
-      existing.ids.push(ids[i]);
-      existing.documents.push(chunks[i]);
-      existing.embeddings.push(embeddings[i]);
-      existing.metadatas.push(metadatas[i]);
-    }
-  }
-
-  store.set(collectionName, existing);
-  saveStore(store);
+  // Replace entire collection on every analyze run
+  store.set(collectionName, { documents: chunks, embeddings, metadatas });
 
   console.log(`[ContentIQ] Stored ${chunks.length} chunks in ${collectionName}`);
   return { chunkCount: chunks.length };
@@ -112,8 +69,8 @@ export async function queryVideoChunks({ collectionName, query, nResults = 2 }) 
     const top = scored.slice(0, nResults);
 
     return {
-      documents: top.map((r) => r.document),
-      metadatas: top.map((r) => r.metadata),
+      documents: top.map(r => r.document),
+      metadatas: top.map(r => r.metadata),
     };
   } catch (err) {
     console.error(`[ContentIQ] Query failed for ${collectionName}:`, err.message);

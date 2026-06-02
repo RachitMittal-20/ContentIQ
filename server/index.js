@@ -11,9 +11,11 @@ dotenv.config();
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 app.use(
   cors({
-    origin: ['http://localhost:5173', 'https://contentiq.vercel.app'],
+    origin: ['http://localhost:5173', 'https://content-iq-lake.vercel.app', 'https://contentiq.vercel.app'],
     credentials: true,
   }),
 );
