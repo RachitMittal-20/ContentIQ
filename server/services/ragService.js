@@ -67,8 +67,11 @@ export async function handleAnalyze({ videoA, videoB }) {
 }
 
 export async function handleChatStream({ res, message, history = [], metadata }) {
-  const metadataA = metadata?.A || { title: 'Video A', creatorName: 'Unknown', views: 0, likes: 0, comments: 0, engagementRate: 0 };
-  const metadataB = metadata?.B || { title: 'Video B', creatorName: 'Unknown', views: 0, likes: 0, comments: 0, engagementRate: 0 };
+  const metadataA = metadata?.A || sessionStore.metadataByVideoId?.A || { title: 'Video A', creatorName: 'Unknown', views: 0, likes: 0, comments: 0, engagementRate: 0 };
+  const metadataB = metadata?.B || sessionStore.metadataByVideoId?.B || { title: 'Video B', creatorName: 'Unknown', views: 0, likes: 0, comments: 0, engagementRate: 0 };
+  console.log('[ContentIQ] Chat metadata source — request body:', !!metadata?.A, '| sessionStore:', !!sessionStore.metadataByVideoId?.A);
+  console.log('[ContentIQ] metadataA views/likes/er:', metadataA.views, metadataA.likes, metadataA.engagementRate);
+  console.log('[ContentIQ] metadataB views/likes/er:', metadataB.views, metadataB.likes, metadataB.engagementRate);
 
   const [resultsA, resultsB] = await Promise.all([
     queryVideoChunks({ collectionName: 'video_a_chunks', query: message, nResults: 1 }),
